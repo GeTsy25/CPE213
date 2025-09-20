@@ -5,114 +5,107 @@
 #include <DHT.h>
 #include <ESP32Servo.h>
 
+// ===== CONFIG =====
 #define DHTPIN 15
 #define DHTTYPE DHT11
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 #define OLED_RESET -1
 
-#define SERVO1_PIN 14
+#define SERVO1_PIN 14   // Servo1
 #define BTN_UP 32
 #define BTN_DOWN 33
 
+// ===== OBJECTS =====
 DHT dht(DHTPIN, DHTTYPE);
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 Servo servo1;
 
-int humidityThreshold = 65;
-float currentHumidity = 0;
+// ===== VARIABLES =====
+int humidityThreshold = 60;
+int currentHumidity = 0;
 unsigned long lastRead = 0;
-bool btnUpPrev = HIGH;
-bool btnDownPrev = HIGH;
-
-// state servo: 0 = ปิด, 1 = เปิด
-bool servoOpen = false;
 
 void setup() {
   Serial.begin(115200);
+
+  // DHT
   dht.begin();
 
+  // OLED
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-    for (;;);
+    for (;;); // ถ้าไม่เจอจอให้ค้าง
   }
   display.clearDisplay();
   display.setTextSize(2);
   display.setTextColor(SSD1306_WHITE);
 
-  servo1.attach(SERVO1_PIN, 500, 2400);
-  servo1.write(0); // เริ่มปิด
+  // Servo setup (min/max pulse)
+  servo1.attach(SERVO1_PIN, 500, 2400); 
+  servo1.write(90);  // stop (สำหรับ servo 360°)
 
+  // Buttons
   pinMode(BTN_UP, INPUT_PULLUP);
   pinMode(BTN_DOWN, INPUT_PULLUP);
 
-  display.setCursor(20, 20);
-  display.println("System Init");
+  // Welcome screen
+  display.setCursor(15, 20);
+  display.println("Humidity");
+  display.setCursor(20, 45);
+  display.println("System");
   display.display();
   delay(2000);
 }
 
 void loop() {
-  // ----- Button Handling -----
-  bool btnUpNow = digitalRead(BTN_UP);
-  bool btnDownNow = digitalRead(BTN_DOWN);
-
-  if (btnUpPrev == HIGH && btnUpNow == LOW) {
-    humidityThreshold++;
-    Serial.printf("Threshold UP: %d\n", humidityThreshold);
-  }
-  if (btnDownPrev == HIGH && btnDownNow == LOW) {
-    humidityThreshold--;
-    Serial.printf("Threshold DOWN: %d\n", humidityThreshold);
-  }
-  btnUpPrev = btnUpNow;
-  btnDownPrev = btnDownNow;
-
-  // ----- Sensor Read every 2s -----
   if (millis() - lastRead >= 2000) {
     lastRead = millis();
-    float h = dht.readHumidity();
+    currentHumidity = dht.readHumidity();
 
-    if (isnan(h)) {
-      Serial.println("Failed to read from DHT!");
-      display.clearDisplay();
-      display.setCursor(10, 20);
-      display.println("Sensor Err");
-      display.display();
-      return;
+    // ปุ่มปรับ threshold
+    if (digitalRead(BTN_UP) == LOW) {
+      humidityThreshold++;
+      delay(200);
+    }
+    if (digitalRead(BTN_DOWN) == LOW) {
+      humidityThreshold--;
+      delay(200);
     }
 
-    currentHumidity = h;
-
-    // OLED
+    // OLED display
     display.clearDisplay();
     display.setTextSize(2);
-    display.setCursor(0, 0);
-    display.print("H:");
-    display.print(currentHumidity, 1);
-    display.println("%");
+    if (isnan(currentHumidity)) {
+      display.setCursor(10, 20);
+      display.println("Sensor Err");
+    } else {
+      display.setCursor(0, 0);
+      display.print("H:");
+      display.print(currentHumidity);
+      display.println("%");
 
-    display.setCursor(0, 35);
-    display.print("Set:");
-    display.print(humidityThreshold);
-    display.println("%");
+      display.setCursor(0, 35);
+      display.print("Set:");
+      display.print(humidityThreshold);
+      display.println("%");
+    }
     display.display();
 
-    // ----- Stable Servo Logic (with hysteresis) -----
-    if (!servoOpen && currentHumidity < humidityThreshold - 3) {
-      // ปิดอยู่ และความชื้นต่ำเกิน → เปิด
-      servo1.write(90);
-      servoOpen = true;
-      Serial.println("Servo -> OPEN (90°)");
-    } 
-    else if (servoOpen && currentHumidity >= humidityThreshold ) {
-      // เปิดอยู่ และความชื้นสูงเกิน → ปิด
-      servo1.write(0);
-      servoOpen = false;
-      Serial.println("Servo -> CLOSE (0°)");
-    } 
-    else {
-      // อยู่ในช่วง threshold ±3 → คงสถานะเดิม
-      Serial.println("Humidity stable, no change");
+    // Logic Servo
+    if (!isnan(currentHumidity) && currentHumidity < humidityThreshold) {
+      // Servo1 (360°) หมุน 5 วิ
+      servo1.write(180); 
+      delay(5000);
+
+      // อ่านค่าซ้ำ
+      currentHumidity = dht.readHumidity();
+      if (currentHumidity < humidityThreshold) {
+        servo1.write(180);
+        delay(3000);
+      }
+
+      // ปิด servo
+      servo1.write(90);  // stop
     }
   }
 }
