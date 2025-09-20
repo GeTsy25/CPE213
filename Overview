@@ -1,0 +1,18 @@
+# Project Overview
+
+**Project Title:** ESP32 Humidity Controlled Servo System
+
+## Objective
+พัฒนาระบบควบคุม Servo Motor โดยใช้ ESP32 และ DHT11  
+เพื่อเปิด/ปิดตามค่าความชื้นที่กำหนด
+
+## Hardware
+- ESP32 DevKit V1
+- DHT11 Sensor
+- Servo Motor (180°)
+- OLED SSD1306 (128x64)
+- Push Buttons (เพิ่ม/ลด Threshold)
+
+## Software
+- Arduino IDE / PlatformIO
+- Libraries: DHT, Adafruit_SSD1306, Adafruit_GFX, ESP32Servo
