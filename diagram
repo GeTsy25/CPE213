@@ -1,0 +1,5 @@
+[ DHT11 ] → (Humidity) → [ ESP32 ] → [ Servo Motor ]
+                         ↓
+                       [ OLED Display ]
+                         ↑
+                  [ Buttons Input ]
